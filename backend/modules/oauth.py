@@ -40,7 +40,7 @@ def auth():
     oauth_sub  = str(userinfo["sub"])
     oauth_name = str(userinfo["name"])
 
-    jwt       = create_access_token(identity=oauth_sub)
+    jwt        = create_access_token(identity=oauth_sub)
 
 
     user_exists = bool(db.session.execute(db.select(User).filter_by(oauth_sub=oauth_sub)).first())
@@ -48,9 +48,12 @@ def auth():
         user = User()
         user.oauth_sub = oauth_sub
         user.displayname = oauth_name
-        
         db.session.add(user)
         db.session.commit()
+
+        log.info(f"new registration: {userinfo["email"]} <{oauth_sub}>")
+
+    log.info(f"auth - {userinfo["email"]} <{oauth_sub}>")
 
     return redirect(f"{os.environ["FRONTEND_URL"]}/?jwt="+jwt)
 
