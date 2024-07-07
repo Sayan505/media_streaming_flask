@@ -11,11 +11,17 @@ services:
       - ${PGDATA}:/var/lib/postgresql/data/
     ports:
       - 5432:5432
-
+    healthcheck:
+      test: pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  
   backend:
     container_name: backend
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     env_file:
       - .env
     build: ./backend/
