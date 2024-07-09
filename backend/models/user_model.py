@@ -12,10 +12,9 @@ class UserRoleEnum(enum.Enum):
     Admin    = "admin"
 
 class User(db.Model):
-    __tablename__ = "users"
-
-    id:          Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    oauth_sub:   Mapped[str] = mapped_column(nullable=False, unique=True)
-    displayname: Mapped[str] = mapped_column(nullable=False)
-    user_role:   Mapped[str] = mapped_column(nullable=False, default=UserRoleEnum.Listener.value)
+    id:           Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    oauth_sub:    Mapped[str] = mapped_column(nullable=False, unique=True)
+    display_name: Mapped[str] = mapped_column(nullable=False)
+    email:        Mapped[str] = mapped_column(default="")
+    user_role:    Mapped[str] = mapped_column(nullable=False, default=UserRoleEnum.Listener.value)
 
