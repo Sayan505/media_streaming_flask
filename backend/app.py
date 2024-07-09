@@ -16,13 +16,15 @@ app.url_map.strict_slashes   = False
 app.config["JSON_SORT_KEYS"] = False
 app.secret_key               = os.environ["FLASK_SECRET_KEY"]
 
+
 # init CORS
 CORS(app)
 
-# init PyJWT
+
+# config PyJWT
 app.config["JWT_SECRET_KEY"]           = os.environ["JWT_SECRET_KEY"]
-app.config["JWT_TOKEN_LOCATION"]       = ["headers"]  # bearer
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = False
+app.config["JWT_ENCODE_NBF"]           = False
 JWTManager(app)
 
 
