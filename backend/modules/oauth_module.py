@@ -1,3 +1,7 @@
+from flask import Blueprint
+blueprint = Blueprint("oauth_module", __name__)
+
+
 import os
 
 from flask import current_app, url_for, redirect
@@ -9,10 +13,6 @@ from config.orm        import db
 from models.user_model import User 
 
 from config.logger     import log
-
-
-from flask import Blueprint
-blueprint = Blueprint("oauth_module", __name__)
 
 
 oauth = OAuth(current_app)
@@ -44,19 +44,20 @@ def auth():
 
     user_role   = db.session.execute(db.select(User.user_role).filter_by(oauth_sub=oauth_sub)).scalar_one_or_none()  # get role if user exists or None
     if not user_role:
-        user             = User()      # register new user
-        user.oauth_sub   = oauth_sub
-        user.displayname = oauth_name
+        user              = User()      # register new user
+        user.oauth_sub    = oauth_sub
+        user.display_name = oauth_name
+        user.email        = oauth_email
         db.session.add(user)
         db.session.commit()
 
-        user_role        = user.user_role
+        user_role         = user.user_role
 
         log.info(f"new registration: {oauth_email} <{oauth_sub}>")
 
-    # FIXME: TOKEN HAS EXPIRED
     jwt = create_access_token(identity=oauth_sub, fresh=True)
     log.info(f"auth - {oauth_email} <{oauth_sub}> as {str(user_role)}")
 
+    # redirect to frontend
     return redirect(f"{os.environ["FRONTEND_URL"]}/login/callback/?jwt={jwt}&role={str(user_role)}")
 
