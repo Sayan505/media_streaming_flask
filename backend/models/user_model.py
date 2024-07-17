@@ -7,8 +7,8 @@ from config.orm     import db
 
 class UserRoleEnum(enum.Enum):
     Banned   = "banned"
-    Listener = "listener"
-    Artist   = "artist"
+    Consumer = "consumer"
+    Uploader = "uploader"
     Admin    = "admin"
 
 class User(db.Model):
@@ -16,5 +16,5 @@ class User(db.Model):
     oauth_sub:    Mapped[str] = mapped_column(nullable=False, unique=True)
     display_name: Mapped[str] = mapped_column(nullable=False)
     email:        Mapped[str] = mapped_column(default="")
-    user_role:    Mapped[str] = mapped_column(nullable=False, default=UserRoleEnum.Listener.value)
+    user_role:    Mapped[str] = mapped_column(nullable=False, default=UserRoleEnum.Consumer.value)
 
