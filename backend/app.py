@@ -15,7 +15,7 @@ app = Flask(__name__)
 
 # config server
 app.url_map.strict_slashes       = False
-app.config["JSON_SORT_KEYS"]     = False
+app.json.sort_keys               = False
 app.secret_key                   = os.environ["FLASK_SECRET_KEY"]
 
 # config uploads
