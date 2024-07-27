@@ -30,8 +30,7 @@ def get_media_type(uploaded_file_path):
         if proc.returncode != 0:
             return None
 
-
-        probe   = json.loads(proc.stdout)
+        probe   = json.loads(proc.stdout.decode("utf-8"))
 
         streams = probe["streams"]
         if len(streams) <= 0:
@@ -91,7 +90,7 @@ def media():
             return { "status": "disallowed filetype" }, 422
 
 
-        uploaded_file_path = os.path.join(f"{os.environ["UPLOAD_FOLDER"]}/temp/", f"{str(media_uuid)}.dat")  # upload unprobed files to temp
+        uploaded_file_path = os.path.join(f"{os.environ["UPLOAD_FOLDER"]}/", "temp/", f"{str(media_uuid)}.dat")  # upload unprobed files to temp
         file.save(uploaded_file_path)
 
         media_type = get_media_type(uploaded_file_path)  # then probe it
@@ -102,5 +101,5 @@ def media():
         # create db record in the seperate pending table(yet to reencode to hls)
         # then move it to the /storage/sub/uuid.mp4 OR delete if failed
 
-        return { "status": media_type }, 200
+        return { "status": "queued", "media_type": media_type.value }, 200
 
