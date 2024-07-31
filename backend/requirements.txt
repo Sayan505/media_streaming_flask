@@ -10,4 +10,5 @@ Flask-JWT-Extended==4.6.0
 PyJWT==2.8.0
 watchdog==4.0.1
 requests==2.32.3
+confluent-kafka==2.5.0
 
