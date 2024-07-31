@@ -1,13 +1,17 @@
 import os
+from   threading          import Thread
 
-from flask              import Flask
-from flask_cors         import CORS
-from flask_jwt_extended import JWTManager
+from   flask              import Flask
+from   flask_cors         import CORS
+from   flask_jwt_extended import JWTManager
 
-from config.orm         import db
+from   config.orm         import db
 
 # import modules
-from modules            import oauth_module, user_module, hls_module
+from   modules            import startup_module, oauth_module, user_module, media_module
+
+# import kafka consumer task
+from   tasks.consumer     import kafka_consumer_routine
 
 
 # init server
@@ -41,11 +45,16 @@ with app.app_context():
     db.create_all()
 
 
+# run kafka consumer task
+Thread(daemon=True, target=kafka_consumer_routine, args=(app.app_context(),)).start()
+
+
 # register modules
 module_blueprints = [
+    startup_module.blueprint,
     oauth_module.blueprint,
     user_module.blueprint,
-    hls_module.blueprint
+    media_module.blueprint
 ]
 for mbp in module_blueprints:
     app.register_blueprint(mbp)
