@@ -39,9 +39,6 @@ services:
       KAFKA_LOG_RETENTION_MS: -1
       KAFKA_LOG_FLUSH_INTERVAL_MESSAGES: 1
       KAFKA_LOG_FLUSH_INTERVAL_MS: 500
-    #command: /opt/kafka/bin/kafka-topics.sh --create --if-not-exists --topic ${KAFKA_TOPIC} --replication-factor=1 --partitions=1 --bootstrap-server kafka:9092
-    volumes:
-      - ${KAFKA_DATA}:/var/lib/kafka/data/
     healthcheck:
       test: /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server kafka:9092
       interval: 10s
