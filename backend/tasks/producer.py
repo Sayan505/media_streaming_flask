@@ -1,9 +1,10 @@
 import os
+import json
 
 from   config.logger       import log
 
 from   config.orm          import db
-from   models.upload_model import Pending, MediaStatusEnum
+from   models.upload_model import Media, MediaStatusEnum
 
 from   confluent_kafka     import Producer
 
@@ -19,10 +20,10 @@ def kafka_delivery_report_cb(err, msg):
     if err is not None:
         log.error(f"kproducer - message delivery error: {err}")
     else:
-        media_uuid = msg.value().decode("utf-8")
-        pending    = db.session.execute(db.select(Pending).filter_by(uuid=media_uuid)).scalar_one_or_none()
-        if pending:
-            pending.media_status = MediaStatusEnum.Queued.value  # mark as queued
+        # on msg delivered, mark the db record as queued
+        media_uuid = json.loads(msg.value().decode("utf-8"))["media_uuid"]
+        response   = db.session.execute(db.update(Media).where(Media.uuid == media_uuid).values(media_status=MediaStatusEnum.Queued.value))
+        if response.rowcount >= 1:
             db.session.commit()
             log.info(f"kproducer - media uuid <{media_uuid}> successfully dispatched for media2hls")
 
