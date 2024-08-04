@@ -29,8 +29,8 @@ def title_filter(title):
     allowed_charset = set(string.ascii_letters + string.digits + string.punctuation + ' ')
 
     title = title.strip()
-    if not (len(title) >= 4 and len(title) <= 100):
-        return None, "title should be alteast 4 characters long and within 100 characters"
+    if not (len(title) >= 3 and len(title) <= 100):
+        return None, "title should be alteast 3 characters long and within 100 characters"
 
     if set(title) <= allowed_charset:
         return title, None
