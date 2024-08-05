@@ -1,11 +1,12 @@
 import os
-import subprocess
 import json
 
 from   config.logger       import log
 
 from   config.orm          import db
 from   models.upload_model import Media, MediaStatusEnum
+
+from   utils.ffmpeg       import media2hls
 
 from   confluent_kafka     import Consumer, TopicPartition
 
@@ -37,6 +38,7 @@ def kafka_consumer_routine(current_app_context):
         # decode the msg
         decoded_msg = json.loads(msg.value().decode("utf-8"))
         media_uuid  = decoded_msg["media_uuid"]
+        media_type  = decoded_msg["media_type"]
         oauth_sub   = decoded_msg["oauth_sub"]
 
         log.info(f"kconsumer - media uuid <{media_uuid}> received for media2hls")
@@ -64,7 +66,7 @@ def kafka_consumer_routine(current_app_context):
 
 
         # transcode it to HLS
-        result = media2hls(uploaded_file_path, os.path.join(f"{os.environ["UPLOAD_FOLDER"]}/", f"{oauth_sub}/", f"{media_uuid}/"), media_uuid)
+        result = media2hls(uploaded_file_path, os.path.join(f"{os.environ["UPLOAD_FOLDER"]}/", f"{oauth_sub}/", f"{media_uuid}/"), media_type, media_uuid)
         if result:
             #if successful, mark it on db as ready
             response = thread_local_db_session.execute(db.update(Media).where(Media.uuid == media_uuid).values(media_status=MediaStatusEnum.Ready.value))
@@ -78,21 +80,4 @@ def kafka_consumer_routine(current_app_context):
         os.remove(uploaded_file_path)  # and delete the original upload, regardless
 
         kconsumer.commit(offsets=[TopicPartition(msg.topic(), msg.partition(), msg.offset() + 1)])
-
-
-
-
-def media2hls(uploaded_file_path, output_folder, media_uuid):
-    log.info(f"kconsumer - media uuid <{media_uuid}> is currently being encoded ...")
-
-    # set up output dir
-    os.makedirs(output_folder, exist_ok=True)
-
-    # encode to HLS!
-    cmdstr = f"ffmpeg -y -i {uploaded_file_path} -map 0:v:0? -map 0:a:0? -preset fast -codec:v libx264 -crf 22 -codec:a aac -b:a 128k -ac 2 -ar 48000 -hls_time 10 -hls_playlist_type vod -hls_flags independent_segments -f hls {output_folder}/playlist.m3u8"
-    proc   = subprocess.run(cmdstr, capture_output=True, shell=True)
-    if proc.returncode != 0:
-        return False
-
-    return True
 
