@@ -3,9 +3,8 @@ blueprint = Blueprint("hls_module", __name__)
 
 
 import os
-import subprocess
-import json
 import string
+import json
 from   uuid                import uuid4
 
 from   flask               import request, make_response, send_from_directory
@@ -16,7 +15,9 @@ from   config.logger       import log
 
 from   config.orm          import db
 from   models.user_model   import User
-from   models.upload_model import Media, MediaStatusEnum, MediaTypeEnum
+from   models.upload_model import Media, MediaStatusEnum
+
+from   utils.ffprobe       import get_media_type
 
 from   tasks.producer      import kproduce
 
@@ -35,46 +36,6 @@ def title_filter(title):
     if set(title) <= allowed_charset:
         return title, None
     else: return None, "title contains disallowed characters"
-
-
-# TODO: refactor to distinguish b/w thumbnails in mp3s vs video streams
-def get_media_type(uploaded_file_path):
-    try:
-        cmdstr = f"ffprobe -print_format json -v quiet -show_format -show_streams {uploaded_file_path}"
-        proc   = subprocess.run(cmdstr, capture_output=True, shell=True, timeout=3)
-        if proc.returncode != 0:
-            return None
-
-        probe   = json.loads(proc.stdout.decode("utf-8"))
-
-        streams = probe["streams"]
-        if len(streams) <= 0:
-            return None
-
-        audio_nstreams = 0
-        video_nstreams = 0
-
-        for stream in streams:
-            codec_type = stream["codec_type"]
-
-            if codec_type == "audio":
-                audio_nstreams += 1
-            elif codec_type == "video":
-                video_nstreams += 1
-            else:
-                return None
-
-
-        if audio_nstreams == 1 and video_nstreams == 0:
-            return MediaTypeEnum.Audio
-        elif audio_nstreams == 1 and video_nstreams == 1:
-            return MediaTypeEnum.Video
-        else:
-            return None
-
-
-    except subprocess.TimeoutExpired:
-        return None
 
 
 
@@ -140,6 +101,7 @@ def upload_new_media():
     # then dispatch for media2hls through kafka
     msg_value = {
         "media_uuid": media_uuid,
+        "media_type": media_type_enum.value,
         "oauth_sub":  user_oauth_sub
     }
     msg_value_json = json.dumps(msg_value)
@@ -155,9 +117,9 @@ def upload_new_media():
 
 
 
-@blueprint.route("/api/v1/media", methods=["PUT"])
+@blueprint.route("/api/v1/media/<media_uuid>", methods=["PUT"])
 @jwt_required()
-def edit_media_title():
+def edit_media_info(media_uuid):
     # verify ident
     jwt_oauth_sub  = get_jwt_identity()
     user_oauth_sub = db.session.execute(db.select(User.oauth_sub).where(User.oauth_sub == jwt_oauth_sub)).scalar_one_or_none()
@@ -170,12 +132,9 @@ def edit_media_title():
     if not req_json:
         return { "status": "bad request" }, 400
 
-    if "media_uuid" not in req_json:
-        return { "status": "media_uuid not supplied" }, 400
     if "title" not in req_json:
         return { "status": "title not supplied" }, 400
 
-    media_uuid = req_json["media_uuid"]
     new_title  = req_json["title"]
 
     new_title_filtered = title_filter(new_title)
@@ -196,23 +155,13 @@ def edit_media_title():
 
 @blueprint.route("/api/v1/media/<media_uuid>", methods=["DELETE"])
 @jwt_required()
-def delete_media():
+def delete_media(media_uuid):
     # verify ident
     jwt_oauth_sub  = get_jwt_identity()
     user_oauth_sub = db.session.execute(db.select(User.oauth_sub).where(User.oauth_sub == jwt_oauth_sub)).scalar_one_or_none()
     if not user_oauth_sub:
         return { "status": "invalid oauth identity" }, 401
 
-
-    # parse req json body
-    req_json = request.get_json(force=True, silent=True, cache=False)
-    if not req_json:
-        return { "status": "bad request" }, 400
-
-    if "media_uuid" not in req_json:
-        return { "status": "media_uuid not supplied" }, 400
-
-    media_uuid = req_json["media_uuid"]
 
     # exec query (match uuid and ownership)
     response = db.session.execute(db.delete(Media).where(Media.uuid == media_uuid).where(Media.ownedby_oauth_sub == user_oauth_sub))
@@ -235,9 +184,10 @@ def get_media_info(media_uuid):
             "media_uuid":           media.uuid,
             "title":                media.title,
             "media_type":           media.media_type,
-            "uploader_displayname": uploader_display_name,
+            "uploader_display_name": uploader_display_name,
             "vod_url":              f"{os.environ["BACKEND_URL"]}/api/v1/media/playback/{media_uuid}/playlist.m3u8"
         }, 200
+
     return { "status": "not found" }, 404
 
 
