@@ -22,7 +22,7 @@ from   utils.ffprobe       import get_media_type
 from   tasks.producer      import kproduce
 
 
-ALLOWED_EXTS = { "mp4", "avi", "mp3", "ogg", "flac", "wav" }
+ALLOWED_EXTS = { "mp4", "avi", "mov", "mkv", "mp3", "ogg", "flac", "wav" }
 def allowed_filetype(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTS
 
@@ -180,12 +180,12 @@ def get_media_info(media_uuid):
     if media:
         uploader_display_name = db.session.execute(db.Select(User.display_name).where(User.oauth_sub == media.ownedby_oauth_sub)).scalar_one_or_none()
         return {
-            "status":               media.media_status,
-            "media_uuid":           media.uuid,
-            "title":                media.title,
-            "media_type":           media.media_type,
+            "status":                media.media_status,
+            "media_uuid":            media.uuid,
+            "title":                 media.title,
+            "media_type":            media.media_type,
             "uploader_display_name": uploader_display_name,
-            "vod_url":              f"{os.environ["BACKEND_URL"]}/api/v1/media/playback/{media_uuid}/playlist.m3u8"
+            "vod_url":               f"{os.environ["BACKEND_URL"]}/api/v1/media/playback/{media_uuid}/playlist.m3u8"
         }, 200
 
     return { "status": "not found" }, 404
