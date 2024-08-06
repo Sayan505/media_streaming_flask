@@ -3,12 +3,13 @@ blueprint = Blueprint("user_module", __name__)
 
 import string
 
-from   flask             import request
+from   flask               import request
 
-from   config.orm        import db
-from   models.user_model import User
+from   config.orm          import db
+from   models.upload_model import Media
+from   models.user_model   import User
 
-from   flask_jwt_extended import jwt_required, get_jwt_identity
+from   flask_jwt_extended  import jwt_required, get_jwt_identity
 
 
 def display_name_filter(display_name):
@@ -25,7 +26,7 @@ def display_name_filter(display_name):
 
 
 
-@blueprint.route("/api/me", methods=["GET"])
+@blueprint.route("/api/v1/me", methods=["GET"])
 @jwt_required()
 def view_self_info():
     jwt_oauth_sub  = get_jwt_identity()
@@ -39,7 +40,7 @@ def view_self_info():
     }, 200
 
 
-@blueprint.route("/api/me", methods=["PUT"])
+@blueprint.route("/api/v1/me", methods=["PUT"])
 @jwt_required()
 def edit_self_info():
     # verify ident
@@ -64,11 +65,50 @@ def edit_self_info():
         return { "status": new_display_name_filtered[1] }, 422
 
 
-    # exec query (match uuid and ownership)
+    # exec query (match by user ident)
     response = db.session.execute(db.update(User).where(User.oauth_sub == user_oauth_sub).values(display_name=new_display_name_filtered))
     if response.rowcount >= 1:
         db.session.commit()
         return { "status": "success" }, 200
 
     return { "status": "bad request" }, 400
+
+
+@blueprint.route("/api/v1/me/uploads", methods=["GET"])
+@jwt_required()
+def get_self_uploads():
+    jwt_oauth_sub  = get_jwt_identity()
+    user_oauth_sub = db.session.execute(db.select(User.oauth_sub).where(User.oauth_sub == jwt_oauth_sub)).scalar_one_or_none()
+    if not user_oauth_sub:
+        return { "status": "invalid oauth identity" }, 401
+
+
+    # parse arg for request page
+    page = request.args.get("page", default=1, type=int)
+
+
+    # exec query
+    paged_response = (Media.query
+        .with_entities(Media.uuid, Media.media_type, Media.title, Media.media_status)
+        .filter(Media.ownedby_oauth_sub == user_oauth_sub)
+        .order_by(Media.media_status.asc())
+        .paginate(page=page, per_page=10))
+
+
+    # serialize response
+    items = [{
+        "media_uuid":   row.uuid,
+        "media_type":   row.media_type,
+        "title":        row.title,
+        "media_status": row.media_status
+    } for row in paged_response.items]
+
+
+    # return response
+    return {
+        "status":       "success",
+        "current_page": page,
+        "npages":       paged_response.pages,
+        "items":        items
+    }, 200
 
