@@ -11,7 +11,7 @@ export default function Me() {
     useEffect(() => {
         set_alleged_role(localStorage.getItem("role"));
         
-        axios_client.get("/api/me").then((res) => {
+        axios_client.get("/api/v1/me").then((res) => {
             set_user_data(res.data);
         });
     }, []);
