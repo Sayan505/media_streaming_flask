@@ -7,11 +7,11 @@ from   flask_jwt_extended import JWTManager
 
 from   config.orm         import db
 
-# import modules
-from   modules            import startup_module, oauth_module, user_module, media_module
-
-# import kafka consumer task
+from   tasks.startup      import resume_svcs
 from   tasks.consumer     import kafka_consumer_routine
+
+# import modules
+from   modules            import oauth_module, user_module, media_module, search_module
 
 
 # init server
@@ -45,16 +45,20 @@ with app.app_context():
     db.create_all()
 
 
-# run kafka consumer task
+# init kafka consumer worker
 Thread(daemon=True, target=kafka_consumer_routine, args=(app.app_context(),)).start()
+
+
+# run server resume routine
+resume_svcs()
 
 
 # register modules
 module_blueprints = [
-    startup_module.blueprint,
     oauth_module.blueprint,
     user_module.blueprint,
-    media_module.blueprint
+    media_module.blueprint,
+    search_module.blueprint
 ]
 for mbp in module_blueprints:
     app.register_blueprint(mbp)
