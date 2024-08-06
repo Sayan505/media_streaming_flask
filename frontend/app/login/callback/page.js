@@ -11,7 +11,6 @@ export default function LoginCallback() {
 
     const { push } = useRouter();
 
-    // save in cookies instead?
     useEffect(() => {
         localStorage.setItem("jwt", jwt);
         localStorage.setItem("role", role);
