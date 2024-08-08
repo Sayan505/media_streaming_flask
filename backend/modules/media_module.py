@@ -5,6 +5,7 @@ blueprint = Blueprint("hls_module", __name__)
 import os
 import string
 import json
+import shutil
 from   uuid                import uuid4
 
 from   flask               import request, make_response, send_from_directory
@@ -162,8 +163,10 @@ def delete_media(media_uuid):
     if not user_oauth_sub:
         return { "status": "invalid oauth identity" }, 401
 
+    # delete from fs
+    shutil.rmtree(os.path.join(f"{os.environ["UPLOAD_FOLDER"]}/", f"{user_oauth_sub}/", f"{media_uuid}/"), ignore_errors=True)
 
-    # exec query (match uuid and ownership)
+    # delete from db (match uuid and ownership)
     response = db.session.execute(db.delete(Media).where(Media.uuid == media_uuid).where(Media.ownedby_oauth_sub == user_oauth_sub))
     if response.rowcount >= 1:
         db.session.commit()
@@ -185,6 +188,7 @@ def get_media_info(media_uuid):
             "title":                 media.title,
             "media_type":            media.media_type,
             "uploader_display_name": uploader_display_name,
+            "upload_date":           media.upload_date,
             "vod_url":               f"{os.environ["BACKEND_URL"]}/api/v1/media/playback/{media_uuid}/playlist.m3u8"
         }, 200
 

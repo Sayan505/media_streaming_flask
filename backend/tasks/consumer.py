@@ -1,5 +1,6 @@
 import os
 import json
+import shutil
 
 from   config.logger       import log
 
@@ -64,13 +65,18 @@ def kafka_consumer_routine(current_app_context):
             log.error(f"kconsumer - media uuid <{media_uuid}> not found in db")
             continue
 
-
+        # craft output path
+        output_path = os.path.join(f"{os.environ["UPLOAD_FOLDER"]}/", f"{oauth_sub}/", f"{media_uuid}/")
+        shutil.rmtree(output_path, ignore_errors=True)  # delete previous incomplete output (if any)
         # transcode it to HLS
-        result = media2hls(uploaded_file_path, os.path.join(f"{os.environ["UPLOAD_FOLDER"]}/", f"{oauth_sub}/", f"{media_uuid}/"), media_type, media_uuid)
+        result = media2hls(uploaded_file_path, output_path , media_type, media_uuid)
         if result:
             #if successful, mark it on db as ready
             response = thread_local_db_session.execute(db.update(Media).where(Media.uuid == media_uuid).values(media_status=MediaStatusEnum.Ready.value))
-            log.info(f"kconsumer - media uuid <{media_uuid}> is ready for playback")
+            if response.rowcount >= 1:
+                log.info(f"kconsumer - media uuid <{media_uuid}> is ready for playback")
+            else:
+                shutil.rmtree(output_path, ignore_errors=True)  # clear from disk on error
         else:
             thread_local_db_session.execute(db.delete(Media).where(Media.uuid == media_uuid))  # else delete from db
             log.error(f"kconsumer - media uuid <{media_uuid}> failed to transcode to HLS")

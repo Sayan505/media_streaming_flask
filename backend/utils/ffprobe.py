@@ -21,8 +21,9 @@ def get_media_type(uploaded_file_path):
         has_audio = any(stream["codec_type"]  == "audio" for stream in streams)
         has_video = any((stream["codec_type"] == "video" and stream["avg_frame_rate"] != "0/0") for stream in streams)  # ignore thumbnails embedded in audio files
 
-        if has_video: return MediaTypeEnum.Video
-        if has_audio: return MediaTypeEnum.Audio
+        if has_video and not has_audio: return MediaTypeEnum.VideoNoSound
+        if has_video and     has_audio: return MediaTypeEnum.Video
+        if has_audio and not has_video: return MediaTypeEnum.Audio
         
         return None
 
