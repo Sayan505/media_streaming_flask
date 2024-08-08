@@ -10,6 +10,8 @@ from   config.orm         import db
 from   tasks.startup      import resume_svcs
 from   tasks.consumer     import kafka_consumer_routine
 
+from   utils.kafka_admin_client import create_kafka_topics
+
 # import modules
 from   modules            import oauth_module, user_module, media_module, search_module
 
@@ -45,8 +47,9 @@ with app.app_context():
     db.create_all()
 
 
-# init kafka consumer worker
-Thread(daemon=True, target=kafka_consumer_routine, args=(app.app_context(),)).start()
+# init kafka
+create_kafka_topics()  # create kafka topic(s)
+Thread(daemon=True, target=kafka_consumer_routine, args=(app.app_context(),)).start()  # init kafka consumer worker
 
 
 # run server resume routine
