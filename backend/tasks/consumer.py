@@ -2,14 +2,16 @@ import os
 import json
 import shutil
 
-from   config.logger       import log
+from   config.logger        import log
 
-from   config.orm          import db
-from   models.upload_model import Media, MediaStatusEnum
+from   config.orm           import db
+from   models.upload_model  import Media, MediaStatusEnum
 
-from   utils.ffmpeg       import media2hls
+from   config.elasticsearch import esclient
 
-from   confluent_kafka     import Consumer, TopicPartition
+from   utils.ffmpeg         import media2hls
+
+from   confluent_kafka      import Consumer, TopicPartition
 
 
 kconsumer = Consumer({
@@ -65,18 +67,34 @@ def kafka_consumer_routine(current_app_context):
             log.error(f"kconsumer - media uuid <{media_uuid}> not found in db")
             continue
 
+
         # craft output path
         output_path = os.path.join(f"{os.environ["UPLOAD_FOLDER"]}/", f"{oauth_sub}/", f"{media_uuid}/")
         shutil.rmtree(output_path, ignore_errors=True)  # delete previous incomplete output (if any)
-        # transcode it to HLS
+
+
+        # transcode it to HLS!
         result = media2hls(uploaded_file_path, output_path , media_type, media_uuid)
+
         if result:
-            #if successful, mark it on db as ready
+            # if successful, fetch its (updated) record id, title from db
+            media = db.session.execute(db.Select(Media.id, Media.title).where(Media.uuid == media_uuid)).first()
+            if media:
+                # then, upsert an elasticsearch entry for it to be discovered
+                esclient.update(index=os.environ["ELASTICSEARCH_MAIN_INDEX"], id=media.id, body={
+                    "doc": {
+                        "media_title":             media.title,
+                        "media_uuid":              media_uuid,
+                        "media_type":              media_type,
+                        "media_ownedby_oauth_sub": oauth_sub
+                    },
+                    "doc_as_upsert": True
+                })
+
+            # then, mark it on db as ready
             response = thread_local_db_session.execute(db.update(Media).where(Media.uuid == media_uuid).values(media_status=MediaStatusEnum.Ready.value))
-            if response.rowcount >= 1:
-                log.info(f"kconsumer - media uuid <{media_uuid}> is ready for playback")
-            else:
-                shutil.rmtree(output_path, ignore_errors=True)  # clear from disk on error
+            if response.rowcount >= 1: log.info(f"kconsumer - media uuid <{media_uuid}> is ready for playback")
+            else: shutil.rmtree(output_path, ignore_errors=True)  # clear from disk on error
         else:
             thread_local_db_session.execute(db.delete(Media).where(Media.uuid == media_uuid))  # else delete from db
             log.error(f"kconsumer - media uuid <{media_uuid}> failed to transcode to HLS")
