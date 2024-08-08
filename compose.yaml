@@ -59,6 +59,8 @@ services:
       - ELASTIC_PASSWORD=${ELASTICSEARCH_PASSWORD}
     expose:
       - 9200:9200
+    volumes:
+      - esdata:/usr/share/elasticsearch/data/
     healthcheck:
       test: curl --silent --fail localhost:9200/_cluster/health
       interval: 10s
@@ -105,4 +107,8 @@ services:
           target: /opt/app/frontend/
         - action: rebuild
           path: ./frontend/package.json
+
+volumes:
+  esdata:
+    driver: local
 
