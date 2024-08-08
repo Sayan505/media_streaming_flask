@@ -11,14 +11,14 @@ def init_elasticsearch():
 
     esindex = os.environ["ELASTICSEARCH_MAIN_INDEX"]
 
-    # create mappings
+    # create mappings if not exists
     if not esclient.indices.exists(index=esindex):
         esclient.indices.create(index=esindex, mappings=mappings)
         log.info(f"elasticsearch - index created: {esindex}")
 
 
 def resume_kafka_consumer():
-    return 1
+    pass
 
 
 def resume_svcs():
