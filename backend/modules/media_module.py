@@ -15,8 +15,10 @@ from   flask_jwt_extended  import jwt_required, get_jwt_identity
 from   config.logger       import log
 
 from   config.orm          import db
-from   models.user_model   import User
+from   models.user_model   import User, UserRoleEnum
 from   models.upload_model import Media, MediaStatusEnum
+
+from  config.elasticsearch import esclient
 
 from   utils.ffprobe       import get_media_type
 
@@ -46,7 +48,7 @@ def title_filter(title):
 def upload_new_media():
     # verify identity
     jwt_oauth_sub  = get_jwt_identity()
-    user_oauth_sub = db.session.execute(db.select(User.oauth_sub).where(User.oauth_sub == jwt_oauth_sub)).scalar_one_or_none()
+    user_oauth_sub = db.session.execute(db.select(User.oauth_sub).where(User.oauth_sub == jwt_oauth_sub).where(User.user_role == UserRoleEnum.Uploader.value)).scalar_one_or_none()
     if not user_oauth_sub:
         return { "status": "unauthorized" }, 401
 
@@ -143,7 +145,23 @@ def edit_media_info(media_uuid):
         return { "status": new_title_filtered[1] }, 422
 
 
-    # exec query (match uuid and ownership)
+    # update on elasticsearch (match uuid and ownership oauth_sub)
+    esclient.update_by_query(index=os.environ["ELASTICSEARCH_MAIN_INDEX"], body={
+        "query": {
+            "bool": {
+                "must": [
+                    { "term": { "media_uuid": media_uuid } },
+                    { "term": { "media_ownedby_oauth_sub": user_oauth_sub } }
+                ]
+            }
+        },
+        "script": {
+            "source": "ctx._source.media_title = params.new_media_title",
+            "params": { "new_media_title": new_title_filtered }
+        }
+    })
+
+    # then, update on db (match uuid and ownership oauth_sub)
     response = db.session.execute(db.update(Media).where(Media.uuid == media_uuid).where(Media.ownedby_oauth_sub == user_oauth_sub).values(title=new_title_filtered))
     if response.rowcount >= 1:
         db.session.commit()
@@ -163,10 +181,23 @@ def delete_media(media_uuid):
     if not user_oauth_sub:
         return { "status": "invalid oauth identity" }, 401
 
+
     # delete from fs
     shutil.rmtree(os.path.join(f"{os.environ["UPLOAD_FOLDER"]}/", f"{user_oauth_sub}/", f"{media_uuid}/"), ignore_errors=True)
 
-    # delete from db (match uuid and ownership)
+    # then, delete from elasticsearch (match uuid and ownership oauth_sub)
+    esclient.delete_by_query(index=os.environ["ELASTICSEARCH_MAIN_INDEX"], body={
+        "query": {
+            "bool": {
+                "must": [
+                    { "term": { "media_uuid": media_uuid } },
+                    { "term": { "media_ownedby_oauth_sub": user_oauth_sub } }
+                ]
+            }
+        }
+    })
+
+    # then, delete from db (match uuid and ownership oauth_sub)
     response = db.session.execute(db.delete(Media).where(Media.uuid == media_uuid).where(Media.ownedby_oauth_sub == user_oauth_sub))
     if response.rowcount >= 1:
         db.session.commit()
