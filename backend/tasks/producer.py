@@ -12,6 +12,7 @@ from   confluent_kafka     import Producer
 kproducer = Producer({
     "bootstrap.servers": "kafka",
     "acks": "all",
+    "enable.idempotence": True,
     "linger.ms": 0
 })
 
