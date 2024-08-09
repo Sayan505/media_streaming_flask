@@ -3,6 +3,7 @@ blueprint = Blueprint("search_module", __name__)
 
 
 import os
+import math
 
 from   flask                import request, jsonify
 
@@ -16,11 +17,14 @@ from   flask_jwt_extended   import jwt_required, get_jwt_identity
 
 
 
-@blueprint.route("/api/v1/search/", methods=["get"])
+@blueprint.route("/api/v1/search/", methods=["GET"])
 def search_all_media():
-    query = request.args.get("query")
+    query = request.args.get("q")
     if not query:
-        return { "status": "provide a ?query=" }, 422
+        return { "status": "provide a ?q=" }, 422
+
+    page = request.args.get("p", 0, type=int)
+    size = 10  # items per page
 
 
     res = esclient.search(index=os.environ["ELASTICSEARCH_MAIN_INDEX"], body={
@@ -29,17 +33,28 @@ def search_all_media():
         },
         "query": {
             "multi_match": {
-                "query": query,
+                "query":  query,
                 "fields": ["media_title^2", "media_uuid", "media_type"]
             }
         }
+    }, from_=page*size, size=size)
+
+    nhits  = res["hits"]["total"]["value"] 
+    npages = math.ceil(nhits / size)
+
+    if page < 0: page = 0
+    elif page > npages: page = npages
+
+
+    return jsonify({
+        "current_page":  page,
+        "npages":        npages,
+        "nhits":         nhits,
+        "hits":          res["hits"]["hits"]
     })
 
 
-    return jsonify(res["hits"]["hits"])
-
-
-@blueprint.route("/api/v1/search/me/", methods=["get"])
+@blueprint.route("/api/v1/search/me/", methods=["GET"])
 @jwt_required()
 def search_self_media():
     # verify ident
@@ -49,9 +64,12 @@ def search_self_media():
         return { "status": "invalid oauth identity" }, 401
 
 
-    query = request.args.get("query")
+    query = request.args.get("q")
     if not query:
-        return { "status": "provide a ?query=" }, 422
+        return { "status": "provide a ?q=" }, 422
+
+    page = request.args.get("p", 0, type=int)
+    size = 10  # items per page
 
 
     res = esclient.search(index=os.environ["ELASTICSEARCH_MAIN_INDEX"], body={
@@ -59,7 +77,7 @@ def search_self_media():
             "bool": {
                 "must": {
                     "multi_match": {
-                        "query": query,
+                        "query":  query,
                         "fields": ["media_title^2", "media_uuid", "media_type"]
                     }
                 },
@@ -68,8 +86,20 @@ def search_self_media():
                 }
             }
         }
+    }, from_=page*size, size=size)
+
+
+    nhits  = res["hits"]["total"]["value"] 
+    npages = math.ceil(nhits / size)
+
+    if page < 0: page = 0
+    elif page > npages: page = npages
+
+
+    return jsonify({
+        "current_page":  page,
+        "npages":        npages,
+        "nhits":         nhits,
+        "hits":          res["hits"]["hits"]
     })
-
-
-    return jsonify(res["hits"]["hits"])
 
