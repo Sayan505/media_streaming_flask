@@ -157,7 +157,7 @@ def edit_media_info(media_uuid):
         },
         "script": {
             "source": "ctx._source.media_title = params.new_media_title",
-            "params": { "new_media_title": new_title_filtered }
+            "params": { "new_media_title": new_title_filtered[0] }
         }
     })
 
