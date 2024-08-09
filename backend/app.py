@@ -53,7 +53,7 @@ Thread(daemon=True, target=kafka_consumer_routine, args=(app.app_context(),)).st
 
 
 # run server resume routine
-resume_svcs()
+resume_svcs(app.app_context())
 
 
 # register modules
