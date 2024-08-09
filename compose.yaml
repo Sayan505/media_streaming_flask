@@ -39,6 +39,9 @@ services:
       KAFKA_LOG_RETENTION_MS: -1
       KAFKA_LOG_FLUSH_INTERVAL_MESSAGES: 1
       KAFKA_LOG_FLUSH_INTERVAL_MS: 500
+      KAFKA_LOG_DIRS: /var/lib/kafka/data/
+    volumes:
+      - kafka-data:/var/lib/kafka/data/
     healthcheck:
       test: /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server kafka:9092
       interval: 10s
@@ -110,5 +113,7 @@ services:
 
 volumes:
   esdata:
+    driver: local
+  kafka-data:
     driver: local
 
