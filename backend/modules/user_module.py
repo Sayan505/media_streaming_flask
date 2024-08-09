@@ -28,7 +28,7 @@ def display_name_filter(display_name):
 
 @blueprint.route("/api/v1/me", methods=["GET"])
 @jwt_required()
-def view_self_info():
+def get_self_info():
     jwt_oauth_sub  = get_jwt_identity()
     user           = db.session.execute(db.select(User).where(User.oauth_sub == jwt_oauth_sub)).scalar_one_or_none()
     if not user:
@@ -66,7 +66,7 @@ def edit_self_info():
 
 
     # exec query (match by user ident)
-    response = db.session.execute(db.update(User).where(User.oauth_sub == user_oauth_sub).values(display_name=new_display_name_filtered))
+    response = db.session.execute(db.update(User).where(User.oauth_sub == user_oauth_sub).values(display_name=new_display_name_filtered[0]))
     if response.rowcount >= 1:
         db.session.commit()
         return { "status": "success" }, 200
@@ -83,14 +83,18 @@ def get_self_uploads():
         return { "status": "invalid oauth identity" }, 401
 
 
-    # parse arg for request page
-    page = request.args.get("page", default=1, type=int)
+    # parse url args
+    page       = request.args.get("p", default=1, type=int)
+    filter_str = request.args.get("f")
+
+    if filter_str: filter_str = f"%{filter_str}%"
+    else: filter_str = "%"
 
 
     # exec query
     paged_response = (Media.query
         .with_entities(Media.uuid, Media.media_type, Media.title, Media.media_status)
-        .filter(Media.ownedby_oauth_sub == user_oauth_sub)
+        .filter(Media.ownedby_oauth_sub == user_oauth_sub).filter(Media.title.ilike(filter_str))
         .order_by(Media.media_status.asc())
         .paginate(page=page, per_page=10))
 
