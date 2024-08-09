@@ -6,23 +6,24 @@ import os
 import string
 import json
 import shutil
-from   uuid                import uuid4
+from   uuid                 import uuid4
 
-from   flask               import request, make_response, send_from_directory
+from   flask                import request, make_response, send_from_directory
 
-from   flask_jwt_extended  import jwt_required, get_jwt_identity
+from   flask_jwt_extended   import jwt_required, get_jwt_identity
 
-from   config.logger       import log
+from   config.logger        import log
 
-from   config.orm          import db
-from   models.user_model   import User, UserRoleEnum
-from   models.upload_model import Media, MediaStatusEnum
+from   config.orm           import db
+from   models.user_model    import User, UserRoleEnum
+from   models.upload_model  import Media, MediaStatusEnum
+from   sqlalchemy.exc       import SQLAlchemyError
 
-from  config.elasticsearch import esclient
+from   config.elasticsearch import esclient
 
-from   utils.ffprobe       import get_media_type
+from   utils.ffprobe        import get_media_type
 
-from   tasks.producer      import kproduce
+from   tasks.producer       import kproduce
 
 
 ALLOWED_EXTS = { "mp4", "avi", "mov", "mkv", "mp3", "ogg", "flac", "wav" }
@@ -95,8 +96,14 @@ def upload_new_media():
     media.media_type        = media_type_enum.value
     media.title             = title[0]
     media.media_status      = MediaStatusEnum.Created.value
-    db.session.add(media)
-    db.session.commit()
+    
+    try:
+        db.session.add(media)
+        db.session.commit()
+    except SQLAlchemyError:
+        os.remove(uploaded_file_path)
+        return { "status": "internal server error" }, 500
+
 
     log.info(f"new upload created as media_uuid: <{media_uuid}> - <{user_oauth_sub}>")
 
